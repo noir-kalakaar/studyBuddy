@@ -1,18 +1,21 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { api } from '../api'
 import './Upload.css'
 
 function Upload() {
-  const [title, setTitle] = useState('')
+  const [textTitle, setTextTitle] = useState('')
+  const [pdfTitle, setPdfTitle] = useState('')
   const [text, setText] = useState('')
   const [source, setSource] = useState('user')
   const [wikiQuery, setWikiQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+  const [pdfFile, setPdfFile] = useState(null)
+  const pdfInputRef = useRef(null)
 
   const handleTextUpload = async (e) => {
     e.preventDefault()
-    if (!title.trim() || !text.trim()) {
+    if (!textTitle.trim() || !text.trim()) {
       setMessage('Please fill in both title and text')
       return
     }
@@ -20,10 +23,34 @@ function Upload() {
     setLoading(true)
     setMessage('')
     try {
-      await api.uploadText(title, text, source)
+      await api.uploadText(textTitle, text, source)
       setMessage('Text uploaded successfully!')
-      setTitle('')
+      setTextTitle('')
       setText('')
+    } catch (error) {
+      setMessage(`Error: ${error.message}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePdfUpload = async (e) => {
+    e.preventDefault()
+    if (!pdfTitle.trim() || !pdfFile) {
+      setMessage('Please provide a title and select a PDF file')
+      return
+    }
+
+    setLoading(true)
+    setMessage('')
+    try {
+      await api.uploadPdf(pdfTitle, pdfFile)
+      setMessage('PDF uploaded and processed successfully!')
+      setPdfTitle('')
+      setPdfFile(null)
+      if (pdfInputRef.current) {
+        pdfInputRef.current.value = ''
+      }
     } catch (error) {
       setMessage(`Error: ${error.message}`)
     } finally {
@@ -63,8 +90,8 @@ function Upload() {
             <input
               type="text"
               id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              value={textTitle}
+              onChange={(e) => setTextTitle(e.target.value)}
               placeholder="Enter document title"
               disabled={loading}
             />
@@ -94,6 +121,37 @@ function Upload() {
           </div>
           <button type="submit" disabled={loading} className="submit-btn">
             {loading ? 'Uploading...' : 'Upload Text'}
+          </button>
+        </form>
+      </div>
+
+      <div className="upload-section">
+        <h3>Upload PDF</h3>
+        <form onSubmit={handlePdfUpload} className="upload-form">
+          <div className="form-group">
+            <label htmlFor="pdf-title">Title:</label>
+            <input
+              type="text"
+              id="pdf-title"
+              value={pdfTitle}
+              onChange={(e) => setPdfTitle(e.target.value)}
+              placeholder="Enter document title"
+              disabled={loading}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="pdf-file">PDF File:</label>
+            <input
+              type="file"
+              id="pdf-file"
+              accept="application/pdf"
+              onChange={(e) => setPdfFile(e.target.files[0] || null)}
+              ref={pdfInputRef}
+              disabled={loading}
+            />
+          </div>
+          <button type="submit" disabled={loading} className="submit-btn">
+            {loading ? 'Uploading...' : 'Upload PDF'}
           </button>
         </form>
       </div>

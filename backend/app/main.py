@@ -1,5 +1,10 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+import io
+import logging
+
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException  # type: ignore[import-not-found]
+from fastapi.middleware.cors import CORSMiddleware  # type: ignore[import-not-found]
+from pypdf import PdfReader  # type: ignore[import-not-found]
+
 from .models import (
     UploadTextRequest, WikiImportRequest,
     ChatRequest, ChatResponse, FeedbackRequest, StatsResponse,
@@ -7,6 +12,8 @@ from .models import (
 )
 from . import rag, wiki, store
 
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -29,6 +36,36 @@ async def health_check():
 @app.post("/api/upload-text")
 async def upload_text(req: UploadTextRequest):
     await rag.store_text(req.title, req.text, req.source)
+    return {"status": "ok"}
+
+
+@app.post("/api/upload-pdf")
+async def upload_pdf(title: str = Form(...), file: UploadFile = File(...)):
+    """
+    Accept a PDF file upload, extract text, and store it as a 'user' document.
+    """
+    if file.content_type not in ("application/pdf", "application/x-pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported")
+
+    raw_bytes = await file.read()
+    reader = PdfReader(io.BytesIO(raw_bytes))
+    pages_text = []
+    for page in reader.pages:
+        try:
+            pages_text.append(page.extract_text() or "")
+        except Exception:
+            continue
+    full_text = "\n\n".join(pages_text)
+
+    if not full_text.strip():
+        raise HTTPException(status_code=400, detail="Could not extract text from PDF")
+
+    logger.info(
+        "Storing PDF '%s' with %d extracted characters",
+        title,
+        len(full_text),
+    )
+    await rag.store_text(title=title, text=full_text, source="user")
     return {"status": "ok"}
 
 

@@ -4,3 +4,5 @@ pydantic
 wikipedia
 httpx
 pytest
+python-dotenv
+pypdf
